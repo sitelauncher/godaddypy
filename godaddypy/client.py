@@ -1,5 +1,6 @@
 import logging
 import sys
+from datetime import datetime
 
 import requests
 
@@ -12,7 +13,7 @@ class Client(object):
     This client is used to connect to the GoDaddy API and to perform requests with said API.
     """
 
-    def __init__(self, account, log_level=logging.WARNING):
+    def __init__(self, account, log_level=logging.WARNING, sandbox=False):
         """Create a new `godaddypy.Client` object
 
         :type account: godaddypy.Account
@@ -25,7 +26,11 @@ class Client(object):
         self.logger.addHandler(logging.StreamHandler())
 
         # Templates
-        self.API_TEMPLATE = 'https://api.godaddy.com/v1'
+        if sandbox:
+            self.API_TEMPLATE = 'https://api.ote-godaddy.com/v1'
+        else:
+            self.API_TEMPLATE = 'https://api.godaddy.com/v1'
+
         self.DOMAINS = '/domains'
         self.DOMAIN_INFO = '/domains/{domain}'
         self.RECORDS = '/domains/{domain}/records'
@@ -58,8 +63,14 @@ class Client(object):
         self.logger.debug('[{req_type}] response: {resp}'.format(resp=resp, req_type=req_type.upper()))
         self.logger.debug('Response data: {}'.format(resp.content))
 
+    def _log_request_from_method(self, req_type, request):
+        self.logger.debug('[{req_type}] request: {req}'.format(req=request, req_type=req_type.upper()))
+
     def _patch(self, url, json=None, **kwargs):
         return self._request_submit(requests.patch, url=url, json=json, **kwargs)
+
+    def _post(self, url, json=None, **kwargs):
+        return self._request_submit(requests.post, url=url, json=json, **kwargs)
 
     def _put(self, url, json=None, **kwargs):
         return self._request_submit(requests.put, url=url, json=json, **kwargs)
@@ -76,6 +87,7 @@ class Client(object):
 
         :type function: (url: Any, data: Any, json: Any, kwargs: Dict)
         """
+        self._log_request_from_method(function.__name__, kwargs.get('json'))
         resp = function(headers=self._get_headers(), **kwargs)
         self._log_response_from_method(function.__name__, resp)
         self._validate_response_success(resp)
@@ -297,6 +309,435 @@ class Client(object):
 
         # If we didn't get any exceptions, return True to let the user know
         return True
+
+    def check_domain_availability(self, domain):
+        """
+        Check if domain name is available for purchase
+        :param domain: Domain name to check
+        :return: {u'available': False,
+                  u'domain': u'example.com',
+                  u'definitive': True,
+                  u'price': 7990000,
+                  u'period': 1,
+                  u'currency': u'USD'}
+        """
+        url = self.API_TEMPLATE + self.DOMAINS + '/available'
+        params = {'domain': domain}
+        return self._get_json_from_response(url, params=params)
+
+    def get_top_level_domains(self, names_only=True):
+        """
+        Full list of TLDs that are available for sale
+        :param names_only:
+        :return: [{u'type': u'GENERIC', u'name': u'academy'}, ...]
+        """
+        url = self.API_TEMPLATE + self.DOMAINS + '/tlds'
+        response = self._get_json_from_response(url)
+        if names_only:
+            return [a['name'] for a in response]
+        return response
+
+    def get_purchase_schema(self, tld):
+        __com_schema = {u'$schema': u'http://json-schema.org/draft-04/schema#',
+                        u'additionalProperties': False,
+                        u'definitions': {u'Address': {u'additionalProperties': False,
+                                                      u'id': u'Address',
+                                                      u'properties': {u'address1': {u'format': u'street-address',
+                                                                                    u'maxLength': 41,
+                                                                                    u'type': u'string'},
+                                                                      u'address2': {u'format': u'street-address2',
+                                                                                    u'maxLength': 41,
+                                                                                    u'type': u'string'},
+                                                                      u'city': {u'format': u'city-name',
+                                                                                u'maxLength': 30,
+                                                                                u'type': u'string'},
+                                                                      u'country': {u'defaultValue': u'US',
+                                                                                   u'description': u"Two-letter ISO country code to be used as a hint for target region<br/><br/>\nNOTE: These are sample values, there are many\n<a href='http://www.iso.org/iso/country_codes.htm'>more</a>",
+                                                                                   u'enum': [u'AC',
+                                                                                             u'AD',
+                                                                                             u'AE',
+                                                                                             u'AF',
+                                                                                             u'AG',
+                                                                                             u'AI',
+                                                                                             u'AL',
+                                                                                             u'AM',
+                                                                                             u'AO',
+                                                                                             u'AQ',
+                                                                                             u'AR',
+                                                                                             u'AS',
+                                                                                             u'AT',
+                                                                                             u'AU',
+                                                                                             u'AW',
+                                                                                             u'AX',
+                                                                                             u'AZ',
+                                                                                             u'BA',
+                                                                                             u'BB',
+                                                                                             u'BD',
+                                                                                             u'BE',
+                                                                                             u'BF',
+                                                                                             u'BG',
+                                                                                             u'BH',
+                                                                                             u'BI',
+                                                                                             u'BJ',
+                                                                                             u'BM',
+                                                                                             u'BN',
+                                                                                             u'BO',
+                                                                                             u'BQ',
+                                                                                             u'BR',
+                                                                                             u'BS',
+                                                                                             u'BT',
+                                                                                             u'BV',
+                                                                                             u'BW',
+                                                                                             u'BY',
+                                                                                             u'BZ',
+                                                                                             u'CA',
+                                                                                             u'CC',
+                                                                                             u'CD',
+                                                                                             u'CF',
+                                                                                             u'CG',
+                                                                                             u'CH',
+                                                                                             u'CI',
+                                                                                             u'CK',
+                                                                                             u'CL',
+                                                                                             u'CM',
+                                                                                             u'CN',
+                                                                                             u'CO',
+                                                                                             u'CR',
+                                                                                             u'CV',
+                                                                                             u'CW',
+                                                                                             u'CX',
+                                                                                             u'CY',
+                                                                                             u'CZ',
+                                                                                             u'DE',
+                                                                                             u'DJ',
+                                                                                             u'DK',
+                                                                                             u'DM',
+                                                                                             u'DO',
+                                                                                             u'DZ',
+                                                                                             u'EC',
+                                                                                             u'EE',
+                                                                                             u'EG',
+                                                                                             u'EH',
+                                                                                             u'ER',
+                                                                                             u'ES',
+                                                                                             u'ET',
+                                                                                             u'FI',
+                                                                                             u'FJ',
+                                                                                             u'FK',
+                                                                                             u'FM',
+                                                                                             u'FO',
+                                                                                             u'FR',
+                                                                                             u'GA',
+                                                                                             u'GB',
+                                                                                             u'GD',
+                                                                                             u'GE',
+                                                                                             u'GF',
+                                                                                             u'GG',
+                                                                                             u'GH',
+                                                                                             u'GI',
+                                                                                             u'GL',
+                                                                                             u'GM',
+                                                                                             u'GN',
+                                                                                             u'GP',
+                                                                                             u'GQ',
+                                                                                             u'GR',
+                                                                                             u'GS',
+                                                                                             u'GT',
+                                                                                             u'GU',
+                                                                                             u'GW',
+                                                                                             u'GY',
+                                                                                             u'HK',
+                                                                                             u'HM',
+                                                                                             u'HN',
+                                                                                             u'HR',
+                                                                                             u'HT',
+                                                                                             u'HU',
+                                                                                             u'ID',
+                                                                                             u'IE',
+                                                                                             u'IL',
+                                                                                             u'IM',
+                                                                                             u'IN',
+                                                                                             u'IO',
+                                                                                             u'IQ',
+                                                                                             u'IS',
+                                                                                             u'IT',
+                                                                                             u'JE',
+                                                                                             u'JM',
+                                                                                             u'JO',
+                                                                                             u'JP',
+                                                                                             u'KE',
+                                                                                             u'KG',
+                                                                                             u'KH',
+                                                                                             u'KI',
+                                                                                             u'KM',
+                                                                                             u'KN',
+                                                                                             u'KR',
+                                                                                             u'KV',
+                                                                                             u'KW',
+                                                                                             u'KY',
+                                                                                             u'KZ',
+                                                                                             u'LA',
+                                                                                             u'LB',
+                                                                                             u'LC',
+                                                                                             u'LI',
+                                                                                             u'LK',
+                                                                                             u'LR',
+                                                                                             u'LS',
+                                                                                             u'LT',
+                                                                                             u'LU',
+                                                                                             u'LV',
+                                                                                             u'LY',
+                                                                                             u'MA',
+                                                                                             u'MC',
+                                                                                             u'MD',
+                                                                                             u'ME',
+                                                                                             u'MG',
+                                                                                             u'MH',
+                                                                                             u'MK',
+                                                                                             u'ML',
+                                                                                             u'MM',
+                                                                                             u'MN',
+                                                                                             u'MO',
+                                                                                             u'MP',
+                                                                                             u'MQ',
+                                                                                             u'MR',
+                                                                                             u'MS',
+                                                                                             u'MT',
+                                                                                             u'MU',
+                                                                                             u'MV',
+                                                                                             u'MW',
+                                                                                             u'MX',
+                                                                                             u'MY',
+                                                                                             u'MZ',
+                                                                                             u'NA',
+                                                                                             u'NC',
+                                                                                             u'NE',
+                                                                                             u'NF',
+                                                                                             u'NG',
+                                                                                             u'NI',
+                                                                                             u'NL',
+                                                                                             u'NO',
+                                                                                             u'NP',
+                                                                                             u'NR',
+                                                                                             u'NU',
+                                                                                             u'NZ',
+                                                                                             u'OM',
+                                                                                             u'PA',
+                                                                                             u'PE',
+                                                                                             u'PF',
+                                                                                             u'PG',
+                                                                                             u'PH',
+                                                                                             u'PK',
+                                                                                             u'PL',
+                                                                                             u'PM',
+                                                                                             u'PN',
+                                                                                             u'PR',
+                                                                                             u'PS',
+                                                                                             u'PT',
+                                                                                             u'PW',
+                                                                                             u'PY',
+                                                                                             u'QA',
+                                                                                             u'RE',
+                                                                                             u'RO',
+                                                                                             u'RS',
+                                                                                             u'RU',
+                                                                                             u'RW',
+                                                                                             u'SA',
+                                                                                             u'SB',
+                                                                                             u'SC',
+                                                                                             u'SE',
+                                                                                             u'SG',
+                                                                                             u'SH',
+                                                                                             u'SI',
+                                                                                             u'SJ',
+                                                                                             u'SK',
+                                                                                             u'SL',
+                                                                                             u'SM',
+                                                                                             u'SN',
+                                                                                             u'SO',
+                                                                                             u'SR',
+                                                                                             u'ST',
+                                                                                             u'SV',
+                                                                                             u'SX',
+                                                                                             u'SZ',
+                                                                                             u'TC',
+                                                                                             u'TD',
+                                                                                             u'TF',
+                                                                                             u'TG',
+                                                                                             u'TH',
+                                                                                             u'TJ',
+                                                                                             u'TK',
+                                                                                             u'TL',
+                                                                                             u'TM',
+                                                                                             u'TN',
+                                                                                             u'TO',
+                                                                                             u'TP',
+                                                                                             u'TR',
+                                                                                             u'TT',
+                                                                                             u'TV',
+                                                                                             u'TW',
+                                                                                             u'TZ',
+                                                                                             u'UA',
+                                                                                             u'UG',
+                                                                                             u'UM',
+                                                                                             u'US',
+                                                                                             u'UY',
+                                                                                             u'UZ',
+                                                                                             u'VA',
+                                                                                             u'VC',
+                                                                                             u'VE',
+                                                                                             u'VG',
+                                                                                             u'VI',
+                                                                                             u'VN',
+                                                                                             u'VU',
+                                                                                             u'WF',
+                                                                                             u'WS',
+                                                                                             u'YE',
+                                                                                             u'YT',
+                                                                                             u'ZA',
+                                                                                             u'ZM',
+                                                                                             u'ZW'],
+                                                                                   u'format': u'iso-country-code',
+                                                                                   u'type': u'string'},
+                                                                      u'postalCode': {u'description': u'Postal or zip code',
+                                                                                      u'format': u'postal-code',
+                                                                                      u'maxLength': 10,
+                                                                                      u'minLength': 2,
+                                                                                      u'type': u'string'},
+                                                                      u'state': {u'description': u'State or province or territory',
+                                                                                 u'format': u'state-province-territory',
+                                                                                 u'maxLength': 30,
+                                                                                 u'minLength': 2,
+                                                                                 u'type': u'string'}},
+                                                      u'required': [u'address1',
+                                                                    u'city',
+                                                                    u'state',
+                                                                    u'postalCode',
+                                                                    u'country']},
+                                         u'Consent': {u'additionalProperties': False,
+                                                      u'id': u'Consent',
+                                                      u'properties': {u'agreedAt': {u'description': u'Timestamp indicating when the end-user consented to '
+                                                                                                    u'these legal agreements',
+                                                                                    u'format': u'iso-datetime',
+                                                                                    u'type': u'string'},
+                                                                      u'agreedBy': {u'description': u"Originating client IP address of the end-user's computer "
+                                                                                                    u"when they consented to these legal agreements",
+                                                                                    u'type': u'string'},
+                                                                      u'agreementKeys': {u'description': u'Unique identifiers of the legal agreements to which '
+                                                                                                         u'the end-user has agreed, as returned from '
+                                                                                                         u'the/domains/agreements endpoint',
+                                                                                         u'items': {u'type': u'string'},
+                                                                                         u'type': u'array'}},
+                                                      u'required': [u'agreementKeys',
+                                                                    u'agreedBy',
+                                                                    u'agreedAt']},
+                                         u'Contact': {u'additionalProperties': False,
+                                                      u'id': u'Contact',
+                                                      u'properties': {u'addressMailing': {u'$ref': u'https://domain.api.int.ote-godaddy.com/DomainPurchase#/definitions/Address'},
+                                                                      u'email': {u'format': u'email',
+                                                                                 u'maxLength': 80,
+                                                                                 u'type': u'string'},
+                                                                      u'fax': {u'format': u'phone',
+                                                                               u'maxLength': 17,
+                                                                               u'type': u'string'},
+                                                                      u'jobTitle': {u'type': u'string'},
+                                                                      u'nameFirst': {u'format': u'person-name',
+                                                                                     u'maxLength': 30,
+                                                                                     u'type': u'string'},
+                                                                      u'nameLast': {u'format': u'person-name',
+                                                                                    u'maxLength': 30,
+                                                                                    u'type': u'string'},
+                                                                      u'nameMiddle': {u'type': u'string'},
+                                                                      u'organization': {u'format': u'organization-name',
+                                                                                        u'maxLength': 100,
+                                                                                        u'type': u'string'},
+                                                                      u'phone': {u'format': u'phone',
+                                                                                 u'maxLength': 17,
+                                                                                 u'type': u'string'}},
+                                                      u'required': [u'nameFirst',
+                                                                    u'nameLast',
+                                                                    u'email',
+                                                                    u'phone',
+                                                                    u'addressMailing']}},
+                        u'id': u'https://domain.api.int.ote-godaddy.com/DomainPurchase#',
+                        u'properties': {u'consent': {u'$ref': u'https://domain.api.int.ote-godaddy.com/DomainPurchase#/definitions/Consent'},
+                                        u'contactAdmin': {u'$ref': u'https://domain.api.int.ote-godaddy.com/DomainPurchase#/definitions/Contact'},
+                                        u'contactBilling': {u'$ref': u'https://domain.api.int.ote-godaddy.com/DomainPurchase#/definitions/Contact'},
+                                        u'contactRegistrant': {u'$ref': u'https://domain.api.int.ote-godaddy.com/DomainPurchase#/definitions/Contact'},
+                                        u'contactTech': {u'$ref': u'https://domain.api.int.ote-godaddy.com/DomainPurchase#/definitions/Contact'},
+                                        u'domain': {u'format': u'domain',
+                                                    u'pattern': u'^[^.]{1,63}(\\.[^.]{2,}){1,2}$',
+                                                    u'type': u'string'},
+                                        u'nameServers': {u'items': {u'format': u'host-name',
+                                                                    u'pattern': u'([^.]+\\.)*[^.]+\\.[^.]+',
+                                                                    u'type': u'string'},
+                                                         u'maxItems': 13,
+                                                         u'minItems': 0,
+                                                         u'type': u'array'},
+                                        u'period': {u'defaultValue': 1,
+                                                    u'format': u'integer-positive',
+                                                    u'maximum': 10,
+                                                    u'minimum': 1,
+                                                    u'pattern': u'[1]?[0-9]',
+                                                    u'type': u'integer'},
+                                        u'privacy': {u'defaultValue': False, u'type': u'boolean'},
+                                        u'renewAuto': {u'defaultValue': True, u'type': u'boolean'}},
+                        u'required': [u'domain',
+                                      u'consent',
+                                      u'contactAdmin',
+                                      u'contactBilling',
+                                      u'contactRegistrant',
+                                      u'contactTech']}
+
+        url = self.API_TEMPLATE + self.DOMAINS + '/purchase/schema/' + tld
+        return self._get_json_from_response(url)
+
+    def create_purchase_data_for_domain_registation(self, domain_name, first_name, last_name, email, phone, address1, city, state, postalCode, country, host_ip):
+        tld = domain_name.split('.')[-1]
+        if tld in ('com',):
+            agreements = self.get_agreements_for_tld(tld)
+            print(agreements)
+            address = {
+                'address1': address1,
+                'city': city,
+                'state': state,
+                'postalCode': postalCode,
+                'country': country
+            }
+            contact = {
+                'nameFirst': first_name,
+                'nameLast': last_name,
+                'email': email,
+                'phone': phone,
+                'addressMailing': address
+            }
+            purchase_data = {
+                'domain': domain_name,
+                'consent': {
+                    'agreementKeys': [agreements[0]],
+                    'agreedBy': host_ip,
+                    'agreedAt': datetime.now().isoformat() + 'Z'
+                },
+                'contactAdmin': contact,
+                'contactBilling': contact,
+                'contactRegistrant': contact,
+                'contactTech': contact
+            }
+            self.validate_purchase_data_for_domain_registation(purchase_data)
+            return purchase_data
+
+    def validate_purchase_data_for_domain_registation(self, purchase_data):
+        url = self.API_TEMPLATE + self.DOMAINS + '/purchase/validate'
+        params = purchase_data
+        return self._post(url, params)
+
+    def get_agreements_for_tld(self, tld, privacy_required=False, keys_only=True):
+        url = self.API_TEMPLATE + self.DOMAINS + '/agreements'
+        params = {'tlds': tld, 'privacy': privacy_required}
+        response = self._get_json_from_response(url, params=params)
+        if keys_only:
+            return [a['agreementKey'].encode('utf8') for a in response]
+        return response
 
 
 class BadResponse(Exception):
